@@ -3,6 +3,7 @@ package net.hypixel.resourcepack.impl;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
+import com.google.gson.stream.MalformedJsonException;
 import net.hypixel.resourcepack.Converter;
 import net.hypixel.resourcepack.PackConverter;
 import net.hypixel.resourcepack.Util;
@@ -20,11 +21,14 @@ import java.util.Map;
 public class ModelConverter extends Converter {
 
     private double version;
-    protected String light = "none";
-    public ModelConverter(PackConverter packConverter, String lightIn, String versionIn) {
+    protected String light;
+    private boolean verbose;
+
+    public ModelConverter(PackConverter packConverter, String lightIn, String versionIn, boolean verbose) {
         super(packConverter);
         light = lightIn;
         version = Double.parseDouble(versionIn);
+        this.verbose = verbose;
     }
 
     @Override
@@ -54,6 +58,7 @@ public class ModelConverter extends Converter {
             .filter(path1 -> path1.toString().endsWith(".json"))
             .forEach(model -> {
                 try {
+                    if(this.verbose) System.out.println("      Processing: " + model.getParent() + model.getFileName());
                     JsonObject jsonObject = Util.readJson(packConverter.getGson(), model);
 
                     //GUI light system for 1.15.2
@@ -72,16 +77,25 @@ public class ModelConverter extends Converter {
                     if (jsonObject.has("textures")) {
                         NameConverter nameConverter = packConverter.getConverter(NameConverter.class);
 
-                        JsonObject textureObject = jsonObject.getAsJsonObject("textures");
+                        JsonObject textureObject = null;
+                        try {
+                            //Check to avoid crash on malformed jsons
+                            textureObject = jsonObject.getAsJsonObject("textures");
+                        } catch (ClassCastException e1) {
+                            System.out.println("      Error on model: " + model.getFileName());
+                            System.out.println("      `textures` is malformed, skipping this model");
+                            return;
+                        }
+
                         for (Map.Entry<String, JsonElement> entry : textureObject.entrySet()) {
                             String value = entry.getValue().getAsString();
                             if (version == 1.13) {
-                            if (value.startsWith("block/")) {
-                                textureObject.addProperty(entry.getKey(), "block/" + nameConverter.getBlockMapping().remap(value.substring("block/".length())));
-                            } else if (value.startsWith("item/")) {
-                                textureObject.addProperty(entry.getKey(), "item/" + nameConverter.getItemMapping().remap(value.substring("item/".length())));
+                                if (value.startsWith("block/")) {
+                                    textureObject.addProperty(entry.getKey(), "block/" + nameConverter.getBlockMapping().remap(value.substring("block/".length())));
+                                } else if (value.startsWith("item/")) {
+                                    textureObject.addProperty(entry.getKey(), "item/" + nameConverter.getItemMapping().remap(value.substring("item/".length())));
+                                }
                             }
-                        }
                             if (version > 1.13) {
                                 if (value.startsWith("block/")) {
                                     textureObject.addProperty(entry.getKey(), "block/" + nameConverter.getNewBlockMapping().remap(value.substring("block/".length())));
@@ -97,6 +111,7 @@ public class ModelConverter extends Converter {
                         }
 
                     }
+
                     Files.write(model, Collections.singleton(packConverter.getGson().toJson(jsonObject)), Charset.forName("UTF-8"));
                 } catch (IOException e) {
                     throw Util.propagate(e);

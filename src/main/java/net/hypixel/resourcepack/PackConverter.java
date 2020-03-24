@@ -41,15 +41,10 @@ public class PackConverter {
         // this needs to be run first, other converters might reference new directory names
         if (from.equals("1.12"))
             this.registerConverter(new NameConverter(this, to));
-        if (to.equals("1.15")){
-            this.registerConverter(new PackMetaConverter(this, to));
-        }
-        else if (to.equals("1.14")){
-            this.registerConverter(new PackMetaConverter(this, to));
-        }
-        else this.registerConverter(new PackMetaConverter(this, "1.13"));
+        if (to == null) to = "1.13";
+        this.registerConverter(new PackMetaConverter(this, to));
         if (from.equals("1.12")) {
-            this.registerConverter(new ModelConverter(this, light, to));
+            this.registerConverter(new ModelConverter(this, light, to, this.optionSet.has(Options.VERBOSE)));
             this.registerConverter(new SpacesConverter(this));
             this.registerConverter(new SoundsConverter(this));
             this.registerConverter(new ParticleConverter(this));
